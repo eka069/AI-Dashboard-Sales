@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Dashboard — Adventure Works Sales</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+</head>
+<body>
+
+<!-- TAB BAR -->
+<nav class="tab-bar">
+  <div class="tab-bar-brand">Adventure <span>Works</span></div>
+  <button class="tab-btn active" id="tab-ai" onclick="switchTab('ai')">
+    🤖 AI Dashboard <span class="tab-badge">D3 + LLM</span>
+  </button>
+  <button class="tab-btn" id="tab-tableau" onclick="switchTab('tableau')">
+    📊 Tableau <span class="tab-badge">Tableau Public</span>
+  </button>
+</nav>
+
+<!-- PANEL TABLEAU — lazy load -->
+<div id="panel-tableau" style="display:none">
+  <div class="tableau-wrap">
+    <div class="tableau-header">
+      <div>
+        <h2>Dashboard Adventure Works — Tableau Public</h2>
+        <p>Visualisasi interaktif dengan filter, drill-down, dan tooltip. Klik elemen chart untuk cross-filter.</p>
+      </div>
+      <a class="tableau-link"
+         href="https://public.tableau.com/app/profile/eka.wahyudinarti/viz/AdventureWorksMainDashboard_/Dashboard1"
+         target="_blank">Buka di Tableau Public ↗</a>
+    </div>
+    <div class="tableau-iframe-wrap">
+      <iframe id="tableau-iframe" src=""
+        data-src="https://public.tableau.com/views/AdventureWorksMainDashboard_/Dashboard1?:embed=y&:showVizHome=no&:tabs=no&:toolbar=yes"
+        width="100%" height="600"
+        allowfullscreen
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox">
+      </iframe>
+    </div>
+    <p style="font-size:11px;color:var(--text3);margin-top:12px;text-align:center">
+      Dashboard dibuat dengan Tableau Public · Dataset: Adventure Works Sales · Gunakan filter di atas untuk eksplorasi interaktif
+    </p>
+  </div>
+</div>
+
+<!-- PANEL AI DASHBOARD -->
+<div id="panel-ai">
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Start Date</label>
+      <input type="date" id="filter-start">
+    </div>
+    <div class="filter-group">
+      <label>End Date</label>
+      <input type="date" id="filter-end">
+    </div>
+    <div class="filter-group">
+      <label>Category</label>
+      <select id="filter-category">
+        <option value="all">All Categories</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Sub-Category</label>
+      <select id="filter-subcat">
+        <option value="all">All Sub-Categories</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Segment</label>
+      <select id="filter-segment">
+        <option value="all">All Segments</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Territory</label>
+      <select id="filter-territory">
+        <option value="all">All Territories</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-filter btn-apply" onclick="onFilterChange()">Apply Filter</button>
+      <button class="btn-filter btn-reset" onclick="resetFilters()">Reset</button>
+    </div>
+  </div>
+
+  <!-- ZONA 1: SETUP -->
+  <section class="zone zone-setup">
+    <div class="zone-inner">
+      <span class="zone-kicker">Adventure Works Analytics &nbsp;·&nbsp; AI-Generated Narrative</span>
+      <h1 id="narrative-title">Memuat analisis data...</h1>
+      <p id="setup-text" class="zone-desc"></p>
+      <div class="summary-cards" id="summary-cards"></div>
+    </div>
+  </section>
+
+  <!-- ZONA 2: CONFLICT -->
+  <section class="zone zone-conflict">
+    <div class="zone-inner">
+      <span class="zone-kicker conflict">Conflict &nbsp;·&nbsp; Anomali & Visualisasi</span>
+      <p id="conflict-text" class="zone-desc"></p>
+
+      <!-- Alert Panel -->
+      <div class="alert-panel" style="margin-bottom:16px">
+        <div class="alert-panel-header">
+          <div class="aph-left">
+            <span class="alert-icon">🚨</span>
+            <span class="alert-title">Anomali Terdeteksi</span>
+            <span class="severity-badge severe" id="badge-severe">0 Kritis</span>
+            <span class="severity-badge warning" id="badge-warning">0 Peringatan</span>
+          </div>
+          <button id="btn-narrate" onclick="requestAlertNarration()">🤖 Narasi AI</button>
+        </div>
+        <div class="alert-tabs">
+          <button class="alert-tab active" onclick="switchAlertTab('raw',this)">Data Anomali</button>
+          <button class="alert-tab" onclick="switchAlertTab('ai',this)">Narasi AI</button>
+        </div>
+        <div id="alert-tab-raw" class="alert-tab-content"></div>
+        <div id="alert-tab-ai" class="alert-tab-content" style="display:none">
+          <div id="ai-narration-output">
+            <p class="placeholder-text">Klik "Narasi AI" untuk penjelasan dari LLM.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Grid: Wide + Side -->
+      <div class="charts-grid-wide">
+        <div>
+          <!-- Subcat chart -->
+          <div class="chart-card" style="margin-bottom:12px">
+            <div class="chart-card-title" id="chart-title-subcat">Profit Margin per Sub-Kategori</div>
+            <div class="chart-card-sub">Warna merah/oranye = anomali statistik (Z-score)</div>
+            <div class="chart-legend">
+              <span class="legend-dot" style="background:#64748b"></span> Normal
+              <span class="legend-dot" style="background:#dc2626;margin-left:10px"></span> Anomali Kritis
+              <span class="legend-dot" style="background:#ea580c;margin-left:10px"></span> Anomali Sedang
+            </div>
+            <div id="chart-subcat"></div>
+          </div>
+          <!-- Trend chart -->
+          <div class="chart-card">
+            <div class="chart-card-title" id="chart-title-trend">Tren Sales & Profit per Bulan</div>
+            <div class="chart-card-sub">Garis biru = Sales, garis hijau putus = Profit</div>
+            <div class="chart-legend">
+              <span class="legend-line" style="background:#0ea5e9"></span> Sales
+              <span class="legend-line" style="background:#059669;border-top:2px dashed #059669;margin-left:10px"></span> Profit
+            </div>
+            <div id="chart-trend"></div>
+          </div>
+        </div>
+        <!-- Side column -->
+        <div class="charts-side-col">
+          <div class="chart-card">
+            <div class="chart-card-title">Sales per Kategori</div>
+            <div class="chart-legend">
+              <span class="legend-dot" style="background:#0ea5e9"></span> Bikes
+              <span class="legend-dot" style="background:#8b5cf6;margin-left:8px"></span> Clothing
+              <span class="legend-dot" style="background:#10b981;margin-left:8px"></span> Accessories
+            </div>
+            <div id="chart-category"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Sales & Profit per Territory</div>
+            <div class="chart-card-sub">Bar biru = Sales, bar hijau/merah = Profit</div>
+            <div id="chart-territory"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom charts row -->
+      <div class="charts-grid-2" style="margin-top:12px">
+        <div class="chart-card">
+          <div class="chart-card-title">Scatter: Hubungan Sales vs Profit per Produk</div>
+          <div class="chart-card-sub">Sales besar ≠ selalu profit tinggi — lihat pola di sini</div>
+          <div class="chart-legend">
+            <span class="legend-dot" style="background:#0ea5e9"></span> Bikes
+            <span class="legend-dot" style="background:#8b5cf6;margin-left:8px"></span> Clothing
+            <span class="legend-dot" style="background:#10b981;margin-left:8px"></span> Accessories
+          </div>
+          <div id="chart-scatter"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Top 10 Produk by Profit</div>
+          <div class="chart-card-sub">Produk dengan kontribusi profit tertinggi</div>
+          <div id="chart-top10"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ZONA 3: RESOLUTION -->
+  <section class="zone zone-resolution">
+    <div class="zone-inner">
+      <span class="zone-kicker resolution">Resolution &nbsp;·&nbsp; Insight & Rekomendasi</span>
+      <p id="resolution-text" class="zone-desc"></p>
+      <div class="resolution-grid">
+        <div class="insight-card">
+          <div class="insight-header">
+            <h3>🤖 AI Insight</h3>
+            <span class="model-badge" id="model-badge"></span>
+          </div>
+          <div id="insight-output" class="insight-output">
+            <p class="insight-placeholder">Memuat insight dari AI...</p>
+          </div>
+          <div class="insight-input-wrap">
+            <textarea id="custom-question"
+              placeholder="Tanya sesuatu tentang data ini..." rows="2"></textarea>
+            <button id="btn-insight" onclick="requestInsight()">Minta Insight →</button>
+          </div>
+          <div class="quick-questions">
+            <span class="qq-label">Cepat:</span>
+            <button class="qbtn" onclick="quickAsk('Kategori mana yang harus diprioritaskan untuk meningkatkan profit?')">Prioritas profit?</button>
+            <button class="qbtn" onclick="quickAsk('Territory mana yang perlu perhatian khusus dan mengapa?')">Masalah territory?</button>
+            <button class="qbtn" onclick="quickAsk('Rekomendasi konkret untuk 3 bulan ke depan berdasarkan data ini?')">Rekomendasi?</button>
+            <button class="qbtn" onclick="quickAsk('Mengapa sales besar belum tentu menghasilkan profit tinggi di data ini?')">Sales vs Profit?</button>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Ringkasan Performa per Kategori</div>
+          <div id="category-table"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /panel-ai -->
+
+<footer class="dash-footer">
+  <span>Dataset: Adventure Works Sales &nbsp;·&nbsp; Powered by D3.js + AI</span>
+  <span>Model: <span id="footer-model"></span></span>
+</footer>
+
+<!-- Urutan script: config → aiInsight → anomalyDetector → storyEngine → app -->
+<script src="config.js"></script>
+<script src="aiInsight.js"></script>
+<script src="anomalyDetector.js"></script>
+<script src="storyEngine.js"></script>
+<script src="app.js"></script>
+
+<!-- Tab switching + lazy load Tableau -->
+<script>
+function switchTab(tab) {
+  document.getElementById('tab-ai').classList.toggle('active', tab === 'ai');
+  document.getElementById('tab-tableau').classList.toggle('active', tab === 'tableau');
+  document.getElementById('panel-ai').style.display = tab === 'ai' ? 'block' : 'none';
+  document.getElementById('panel-tableau').style.display = tab === 'tableau' ? 'block' : 'none';
+  if (tab === 'tableau') {
+    const ifr = document.getElementById('tableau-iframe');
+    if (!ifr.src || ifr.src === window.location.href)
+      ifr.src = ifr.getAttribute('data-src');
+  }
+}
+</script>
+
+</body>
+</html>
